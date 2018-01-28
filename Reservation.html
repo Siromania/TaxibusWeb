@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+
+        #nav {
+            margin-left: 37%;
+        }
+
+        /* Je sélectionne les <li> du menu horizontal */
+
+        #navUL {
+            padding: 0;
+            margin: 0;
+            list-style-type: none;
+        }
+
+        div.mainbody {
+            background-color: #f6f6f6;
+            width: 100%;
+            height: 100% margin-bottom:50px;
+        }
+
+        ul#navUL li a {
+            float: left;
+            width: 100px;
+            color: black;
+            text-decoration: none;
+            text-align: center;
+            padding: 5px;
+            border: 2px solid;
+            /*pour avoir un effet "outset" avec IE :*/
+            border-color: #DCDCDC #696969 #696969 #DCDCDC;
+        }
+
+        ul#navUL li a:hover {
+            background-color: #D3D3D3;
+            border-color: #696969 #DCDCDC #DCDCDC #696969;
+        }
+
+        #Reservation {
+            margin-top: 30px;
+        }
+
+        #map {
+            margin-top: 30px;
+            width: 90%;
+            margin-left: 5%;
+        }
+
+        #mdpOublie {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="back">
+        <div id="nav" class="smooth_menu" style="display:none;">
+            <ul id="navUL">
+                <li class="home" style="display:inline;margin-left:10px;">
+                    <a href="#" onclick="ShowReservation()">Reservation</a>
+                </li>
+                <li class="about" style="display:inline;margin-left:10px;">
+                    <a href="#" onclick="ShowCarte()" id="carte">Carte</a>
+                </li>
+            </ul>
+        </div>
+        <div id="Reservation" style="display:none;margin-top:50px;">
+            <label>Arret de depart</label>
+            <SELECT name="Liste" id="secteurA"></SELECT>
+            <input list="list_Depart" type="text" id="input" onchange="changeHoraire()" required>
+            <datalist id="list_Depart">
+            </datalist>
+            <label>Arret d'arrive</label>
+            <SELECT name="Liste" id="secteurB"></SELECT>
+            <input list="list_Arrive" type="text" id="inputB" onchange="changeHoraire()" required>
+            <datalist id="list_Arrive">
+            </datalist>
+            <label>Date et heure de depart</label>
+            <input type="date" id="datefield" name="date" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" onchange="changeHoraire()" required>
+            <SELECT name="Liste" id="timefield">
+            </SELECT>
+            <input type="submit" value="Reservation" id="buttonReservation" required>
+        </div>
+        <div id="map" style="display:none;"></div>
+        <div id="Enregistrement" style="display:none;">
+            <label>
+                <b>Numero de carte</b>
+            </label>
+            <input type="text" placeholder="Numero Carte" name="numCarte" id="numCarte" required>
+            <input type="submit" value="Creer" id="enregistre">
+            </button>
+        </div>
+        <div id="Login" style="display:block;">
+            <input type="text" placeholder="Numero de carte" id="loginfield" required>
+            <input type="password" placeholder="Mot de passe" id="passwordfield" required>
+            <input type="submit" value="Log In" id="loginButton">
+            <a href="#" id="mdpOublie">Mot de passe oublie ?</a>
+            </p>
+            <a href="#" id="nouveau">Nouveau ?</a>
+            </p>
+        </div>
+    </div>
+    <script>
+        // Gestion envoie mail
+        document.getElementById("enregistre").addEventListener("click", envoieEmail);
+        function envoieEmail() {
+            numCarte = document.getElementById("numCarte").value;
+            console.log(numCarte);
+            jQuery.ajax({
+                url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/usager/recherche',
+                method: "POST",
+                accepts: "application/json",
+                data: JSON.stringify({ numero: numCarte }),
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log(data[0].courriel);
+                    jQuery.post("http://www.taxibusvalleyfield.com/taxibus/wp-content/themes/taxibus/test.php",
+                        {
+                            mail: data[0].courriel,
+                            numeroCarte: data[0].numero_usager
+                        },
+                        function (data, status) {
+                            console.log("Mail Envoyee");
+                            alert("Votre mot de passe vous a été envoyée par mail.\n N'oubliez pas de regarder vos spam si vous ne l'avez pas reçu.");
+                        }).fail(function () {
+                            alert("Le mail ou nos service sont indisponible veuillez nous contacter.");
+                        });
+                },
+                error: function (data) {
+                    alert("Le numéro de carte est invalide vérifier le numéro. ");
+                }
+            });
+        }
+        // Gestion de la map
+        function initMap() {
+            var valleyfield = new google.maps.LatLng(45.255594, -74.132387);
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 6,
+                center: valleyfield
+            });
+        }
+        function initMark() {
+            var valleyfield = new google.maps.LatLng(45.255594, -74.132387);
+            var infoWindow = new google.maps.InfoWindow();
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 15,
+                center: valleyfield
+            });
+            for (var i = 0; i < localisation.length; i++) {
+                console.log(localisation[i][0] + localisation[i][1] + localisation[i][2] + localisation[i][3]);
+                var positionTmp = { lat: localisation[i][2], lng: localisation[i][3] };
+                var titleTmp = localisation[i][1] + " - " + localisation[i][0];
+                infoWindow.setContent("test");
+                var marker = new google.maps.Marker({
+                    position: positionTmp,
+                    map: map,
+                    title: titleTmp,
+                    content: infoWindow
+                });
+                google.maps.event.addListener(marker, 'click', function () {
+                    infoWindow.setContent("test");
+                    infoWindow.open(map, marker);
+                });
+            }
+        }
+        // Gestion Liste deroulante
+        document.getElementById("secteurA").addEventListener("click", AjouteArretA);
+        function AjouteArretA() {
+            var secteur = document.getElementById("secteurA").value;
+            jQuery.ajax({
+                url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/arret/recherche',
+                method: "POST",
+                accepts: "application/json",
+                data: JSON.stringify({ "secteur": secteur }),
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log("Ajout des arrets");
+                    document.getElementById("list_Depart").innerHTML = "";
+                    document.getElementById("list_Depart").value = "";
+                    document.getElementById("list_Depart").text = "";
+                    for (let i = 0; i < Object.keys(data).length; i++) {
+                        document.getElementById("list_Depart").innerHTML += "<option name=\"" + data[i].id + "\"value=\"" + data[i].numero + "\">" + data[i].nom + "</option\">";
+                    }
+                },
+                error: function (data) {
+                    console.log("Connexion invalide");
+                }
+            });
+        }
+        document.getElementById("secteurB").addEventListener("click", AjouteArretB);
+        function AjouteArretB() {
+            var secteur = document.getElementById("secteurB").value;
+            jQuery.ajax({
+                url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/arret/recherche',
+                method: "POST",
+                accepts: "application/json",
+                data: JSON.stringify({ "secteur": secteur }),
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log("Ajout des arrets");
+                    document.getElementById("list_Arrive").innerHTML = "";
+                    document.getElementById("list_Arrive").value = "";
+                    for (let i = 0; i < Object.keys(data).length; i++) {
+                        document.getElementById("list_Arrive").innerHTML += "<option name=\"" + data[i].id + "\"value=\"" + data[i].numero + "\">" + data[i].nom + "</option\">";
+                    }
+                },
+                error: function (data) {
+                    console.log("Connexion invalide");
+                }
+            });
+        }
+        var url = 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/secteur/liste';
+        jQuery.ajax({
+            url: url,
+            accepts: "application/json; charset=utf-8",
+            method: "GET",
+            dataType: "json",
+            crossDomain: true,
+            contentType: "application/json; charset=utf-8",
+            cache: false,
+            beforeSend: function (xhr) {
+                /* Authorization header */
+                xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+            },
+            success: function (data) {
+                for (let i = 0; i < Object.keys(data).length; i++) {
+                    document.getElementById("secteurA").innerHTML += "<option value=\"" + data[i].nom + "\">" + data[i].nom + "</option\">";
+                    document.getElementById("secteurB").innerHTML += "<option value=\"" + data[i].nom + "\">" + data[i].nom + "</option\">";
+                    console.log("Secteur: " + data[i].nom);
+                }
+            }
+        });
+        var localisation;
+        console.log("Interroge le WebService Liste Arret ");
+        var url = 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/arret/liste';
+        jQuery.ajax({
+            url: url,
+            accepts: "application/json; charset=utf-8",
+            method: "GET",
+            dataType: "json",
+            crossDomain: true,
+            contentType: "application/json; charset=utf-8",
+            cache: false,
+            beforeSend: function (xhr) {
+                /* Authorization header */
+                xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+            },
+            success: function (data) {
+                localisation = new Array();
+                console.log(data);
+                for (let i = 0; i < Object.keys(data).length; i++) {
+                    localisation[i] = new Array();
+                    localisation[i][0] = data[i].nom;
+                    localisation[i][1] = data[i].numero;
+                    localisation[i][2] = data[i].position_gps.Latitude;
+                    localisation[i][3] = data[i].position_gps.Longitude;
+                    console.log(data[i].numero + " " + data[i].nom);
+                }
+                initMark();
+            }
+        });
+        // Verification de connexion
+        var loginVerifie = false;
+        var usager_id = null;
+        function VerificationLogin() {
+            login = document.getElementById("loginfield").value;
+            password = document.getElementById("passwordfield").value;
+            jQuery.ajax({
+                url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/usager/authentification',
+                method: "POST",
+                accepts: "application/json",
+                data: JSON.stringify({ "mot_passe": password, "numero_usager": login }),
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log("Connexion");
+                    loginVerifie = true;
+                    ShowReservation();
+                    console.log(data.id);
+                    usager_id = data.id;
+                },
+                error: function (data) {
+                    console.log("Connexion invalide");
+                }
+            });
+        }
+        // Gestion des changement de page
+        document.getElementById("loginButton").addEventListener("click", VerificationLogin);
+        document.getElementById("carte").addEventListener("click", ShowCarte);
+        function ShowReservation() {
+            event.preventDefault();
+            console.log("Verification");
+            if (loginVerifie) {
+                document.getElementById("nav").style.display = "block";
+                document.getElementById("Reservation").style.display = "block";
+                document.getElementById("map").style.display = "none";
+                document.getElementById("Login").style.display = "none";
+                document.getElementById("Enregistrement").style.display = "none";
+                document.getElementById("datefield").value = "12/00/00";
+            } else {
+                alert("Mot de passe ou Login Incorrect !");
+            }
+        }
+        function ShowCarte() {
+            event.preventDefault();
+            console.log("Carte");
+            if (loginVerifie) {
+                document.getElementById("nav").style.display = "block";
+                document.getElementById("map").style.display = "block";
+                google.maps.event.trigger(map, 'resize');
+                document.getElementById("Reservation").style.display = "none";
+                document.getElementById("Login").style.display = "none";
+                document.getElementById("Enregistrement").style.display = "none";
+            } else {
+                alert("Mot de passe ou Login Incorrect !");
+            }
+        }
+        document.getElementById("nouveau").addEventListener("click", ShowRegistration);
+        function ShowRegistration() {
+            document.getElementById("nav").style.display = "none";
+            document.getElementById("map").style.display = "none";
+            document.getElementById("Reservation").style.display = "none";
+            document.getElementById("Login").style.display = "none";
+            document.getElementById("Enregistrement").style.display = "block";
+        }
+        document.getElementById("buttonReservation").addEventListener("click", VerificationReservation);
+        function VerificationReservation() {
+            var now = new Date();
+            dateChoice = document.getElementById("datefield").value;
+            dateR = new Date(dateChoice);
+            var month = dateR.getMonth() + 1;
+            var year = dateR.getFullYear();
+            var day = dateR.getDate() + 1;
+            var dateF = year + "-" + month + "-" + day;
+            var monthNow = now.getMonth() + 1;
+            var yearNow = now.getFullYear();
+            var dayNow = now.getDate();
+            var dateFNow = yearNow + "-" + monthNow + "-" + dayNow;
+            console.log(dateF);
+            console.log("Date du jour = " + now);
+            console.log("id de l'Usager = " + usager_id);
+            console.log(document.getElementById("input").value);
+            ModePaiement();
+        }
+        var modePaiement;
+        function LanceReservation() {
+            var now = new Date();
+            var monthNow = now.getMonth() + 1;
+            var yearNow = now.getFullYear();
+            var dayNow = now.getDate();
+            var dateFNow = yearNow + "-" + monthNow + "-" + dayNow;
+            var route_id;
+            var horaireIdD
+            var horaireIdE;
+            for (var i = 0; i < horaire.length; ++i) {
+                if (horaire[i][0] === document.getElementById("timefield").value) {
+                    route_id = horaire[i][1];
+                    horaireIdD = horaire[i][2];
+                    horaireIdE = horaire[i][3];
+                }
+            }
+            jQuery.ajax({
+                url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/demande-usager',
+                method: "POST",
+                accepts: "application/json",
+                data: JSON.stringify({ "mode_paiement": modePaiement, "date_demande": dateFNow, "usager_id": usager_id, "route_id": route_id, "horaire_id_embarquement": horaireIdE, "horaire_id_debarquement": horaireIdD }),
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log("Réservation faite Felicitation");
+                },
+                error: function (data) {
+                    console.log("Liste Échoue");
+                    alert("Problème serveur veuillez ressayer plus tard ");
+                }
+            });
+        }
+        var horaire;
+        function changeHoraire() {
+            dateChoice = document.getElementById("datefield").value;
+            document.getElementById("timefield").innerHTML = "";
+            dateR = new Date(dateChoice);
+            var month = dateR.getMonth() + 1;
+            var year = dateR.getFullYear();
+            var day = dateR.getDate() + 1;
+            var dateF = year + "-" + month + "-" + day;
+            var arretD = document.getElementById("input").value.substr(0, 3);
+            var arretA = document.getElementById("inputB").value.substr(0, 3);
+            if (document.getElementById("datefield").value != "" || document.getElementById("list_Arrive").value != "" || document.getElementById("list_Arrive").value != "" || verifieDate()) {
+                jQuery.ajax({
+                    url: 'https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/horaire/liste',
+                    method: "POST",
+                    accepts: "application/json",
+                    data: JSON.stringify({ "arret_id_embarquement": arretD, "arret_id_debarquement": arretA, "filtre_date": dateF }),
+                    contentType: "application/json",
+                    beforeSend: function (xhr) {
+                        /* Authorization header */
+                        xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                    },
+                    success: function (data) {
+                        console.log("Liste Reussi");
+                        horaire = new Array();
+                        for (let i = 0; i < Object.keys(data).length; i++) {
+                            horaire[i] = new Array();
+                            horaire[i][3] = data[i].horaire_id_embarquement;
+                            horaire[i][2] = data[i].horaire_id_debarquement;
+                            horaire[i][1] = data[i].route_id;
+                            horaire[i][0] = data[i].heure_arret_embarquement;
+                            document.getElementById("timefield").innerHTML += "<option name=\"" + data[i].route_id + "\" value=\"" + data[i].heure_arret_embarquement + "\">" + data[i].heure_arret_embarquement + "</option>";
+                        }
+                    },
+                    error: function (data) {
+                        console.log("Liste Échoue");
+                    }
+                });
+            }
+        }
+        var dateVerifie = false;
+        function verifieDate() {
+            var now = new Date();
+            var auj = new Date(now);
+            dateChoice = document.getElementById("datefield").value;
+            dateR = new Date(dateChoice);
+            dateR.setDate(dateR.getDate() + 1);
+            now.setHours(dateR.getHours());
+            now.setMinutes(dateR.getMinutes());
+            now.setSeconds(dateR.getSeconds());
+            now.setMilliseconds(dateR.getMilliseconds());
+            console.log(dateR.getTime());
+            console.log(now.getTime());
+            if (now.getTime() > dateR.getTime()) {
+                alert("Date de réservation invalide veuille choisir une date dans le future ou du jour même");
+                return false;
+            } else {
+                console.log("Date de réservation valide");
+                return true;
+            }
+        }
+        function ModePaiement() {
+            var arretNumA = document.getElementById("input").value;
+            var arretNumB = document.getElementById("inputB").value;
+            console.log(name);
+            console.log("ouioui " + jQuery("option[value=\'" + arretNumA + "\']").attr("name"));
+            var urlPaye = "https://taxibus.ddns.fraxion.com:8083/Webservice_Repartition_Test/Service_Transport_Collectif/v1/usager/" + usager_id + "/detecte-mode-paiement/" + jQuery("option[value=\'" + arretNumA + "\']").attr("name") + "/" + jQuery("option[value=\'" + arretNumB + "\']").attr("name");
+            console.log(urlPaye);
+            jQuery.ajax({
+                url: urlPaye,
+                method: "GET",
+                accepts: "application/json",
+                contentType: "application/json",
+                beforeSend: function (xhr) {
+                    /* Authorization header */
+                    xhr.setRequestHeader("Authorization", "Basic " + "VGVzdF9UQzpqb2prMmQzZDZod2QzNA==");
+                },
+                success: function (data) {
+                    console.log("Mode paiement détecté");
+                    console.log(data.mode_paiement);
+                    modePaiement = data.mode_paiement;
+                    LanceReservation();
+                },
+                error: function (data) {
+                    console.log("Mode de paiement non detecte");
+                    alert("Problème serveur veuillez ressayer plus tard ");
+                }
+            });
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDevyUKSejkFGBrsXQ-RuLYtxua9I1B_So&callback=initMap">
+    </script>
+</body>
+
+</html>
